@@ -1,20 +1,24 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/components/ui/use-toast";
-import { Dumbbell, Salad, Brain } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import { Dumbbell, Salad, Brain, ThumbsUp, ThumbsDown, Send, Loader2 } from 'lucide-react';
 
 interface Message {
   content: string;
   isUser: boolean;
   timestamp: Date;
+  category?: 'fitness' | 'nutrition' | 'mental';
+  liked?: boolean;
 }
 
 const WellnessBot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -36,8 +40,20 @@ const WellnessBot: React.FC = () => {
     ],
   };
 
-  const addMessage = (content: string, isUser: boolean) => {
-    setMessages(prev => [...prev, { content, isUser, timestamp: new Date() }]);
+  const addMessage = (content: string, isUser: boolean, category?: 'fitness' | 'nutrition' | 'mental') => {
+    setMessages(prev => [...prev, { content, isUser, timestamp: new Date(), category }]);
+  };
+
+  const handleLike = (index: number, liked: boolean) => {
+    setMessages(prev => 
+      prev.map((msg, i) => 
+        i === index ? { ...msg, liked } : msg
+      )
+    );
+    toast({
+      title: liked ? "Glad this was helpful! 💪" : "Thanks for the feedback! 🙏",
+      duration: 2000,
+    });
   };
 
   useEffect(() => {
@@ -47,41 +63,73 @@ const WellnessBot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    addMessage("Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind?", false);
+    const welcomeMessage = "Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind?";
+    setIsTyping(true);
+    setTimeout(() => {
+      addMessage(welcomeMessage, false);
+      setIsTyping(false);
+    }, 1000);
   }, []);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isLoading) return;
 
     const userMessage = inputMessage.trim();
     setInputMessage('');
     addMessage(userMessage, true);
     setIsLoading(true);
+    setIsTyping(true);
 
     setTimeout(() => {
       let response;
+      let category: 'fitness' | 'nutrition' | 'mental' | undefined;
       const lowerMessage = userMessage.toLowerCase();
 
       if (lowerMessage.includes('fitness') || lowerMessage.includes('workout') || lowerMessage.includes('exercise')) {
         response = wellnessTips.fitness[Math.floor(Math.random() * wellnessTips.fitness.length)];
+        category = 'fitness';
       } else if (lowerMessage.includes('food') || lowerMessage.includes('nutrition') || lowerMessage.includes('diet')) {
         response = wellnessTips.nutrition[Math.floor(Math.random() * wellnessTips.nutrition.length)];
+        category = 'nutrition';
       } else if (lowerMessage.includes('mental') || lowerMessage.includes('stress') || lowerMessage.includes('anxiety')) {
         response = wellnessTips.mental[Math.floor(Math.random() * wellnessTips.mental.length)];
+        category = 'mental';
       } else {
         response = "I can help you with fitness, nutrition, and mental wellness. Just let me know what you'd like to focus on!";
       }
 
-      addMessage(response, false);
+      addMessage(response, false, category);
       setIsLoading(false);
-    }, 1000);
+      setIsTyping(false);
+    }, 1500);
   };
 
   const handleQuickSelect = (category: 'fitness' | 'nutrition' | 'mental') => {
+    if (isLoading) return;
     const tip = wellnessTips[category][Math.floor(Math.random() * wellnessTips[category].length)];
     addMessage(`Give me a ${category} tip`, true);
-    addMessage(tip, false);
+    setIsLoading(true);
+    setIsTyping(true);
+    
+    setTimeout(() => {
+      addMessage(tip, false, category);
+      setIsLoading(false);
+      setIsTyping(false);
+    }, 1000);
+  };
+
+  const getCategoryColor = (category?: 'fitness' | 'nutrition' | 'mental') => {
+    switch (category) {
+      case 'fitness':
+        return 'bg-blue-600';
+      case 'nutrition':
+        return 'bg-green-600';
+      case 'mental':
+        return 'bg-purple-600';
+      default:
+        return 'bg-gray-600';
+    }
   };
 
   return (
@@ -95,25 +143,25 @@ const WellnessBot: React.FC = () => {
         <Button
           onClick={() => handleQuickSelect('fitness')}
           variant="outline"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-blue-50 transition-colors"
         >
-          <Dumbbell className="w-4 h-4" />
+          <Dumbbell className="w-4 h-4 text-blue-600" />
           Fitness
         </Button>
         <Button
           onClick={() => handleQuickSelect('nutrition')}
           variant="outline"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-green-50 transition-colors"
         >
-          <Salad className="w-4 h-4" />
+          <Salad className="w-4 h-4 text-green-600" />
           Nutrition
         </Button>
         <Button
           onClick={() => handleQuickSelect('mental')}
           variant="outline"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-purple-50 transition-colors"
         >
-          <Brain className="w-4 h-4" />
+          <Brain className="w-4 h-4 text-purple-600" />
           Mental Health
         </Button>
       </div>
@@ -125,21 +173,44 @@ const WellnessBot: React.FC = () => {
               key={index}
               className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
             >
-              <div
-                className={`max-w-[80%] p-3 rounded-lg ${
-                  message.isUser
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                }`}
-              >
-                {message.content}
+              <div className="flex flex-col gap-2">
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg ${
+                    message.isUser
+                      ? 'bg-blue-600 text-white rounded-br-none'
+                      : `${getCategoryColor(message.category)} text-white rounded-bl-none`
+                  }`}
+                >
+                  {message.content}
+                </div>
+                {!message.isUser && (
+                  <div className="flex gap-2 items-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-green-100"
+                      onClick={() => handleLike(index, true)}
+                    >
+                      <ThumbsUp className={`h-4 w-4 ${message.liked === true ? 'text-green-600' : 'text-gray-400'}`} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-red-100"
+                      onClick={() => handleLike(index, false)}
+                    >
+                      <ThumbsDown className={`h-4 w-4 ${message.liked === false ? 'text-red-600' : 'text-gray-400'}`} />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
-          {isLoading && (
+          {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-800 p-3 rounded-lg rounded-bl-none">
-                <span className="animate-pulse">Typing...</span>
+              <div className="bg-gray-100 text-gray-800 p-3 rounded-lg rounded-bl-none flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Typing...</span>
               </div>
             </div>
           )}
@@ -152,8 +223,10 @@ const WellnessBot: React.FC = () => {
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder="Type your message..."
           className="flex-grow"
+          disabled={isLoading}
         />
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="flex items-center gap-2">
+          <Send className="w-4 h-4" />
           Send
         </Button>
       </form>
