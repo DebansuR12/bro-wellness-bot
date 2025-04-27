@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,9 @@ const WellnessBot: React.FC = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Updated to use the correct model name "gemini-2.0-flash"
   const genAI = new GoogleGenerativeAI("AIzaSyASsNHYrcUMqFjuOReNMICSn6IRTtFpkf0");
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const detectCategory = (message: string): 'fitness' | 'nutrition' | 'mental' | undefined => {
     const lowerMessage = message.toLowerCase();
