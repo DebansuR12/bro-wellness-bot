@@ -1,10 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Dumbbell, Salad, Brain, ThumbsUp, ThumbsDown, Send, Loader2 } from 'lucide-react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Message {
   content: string;
@@ -19,9 +19,11 @@ const WellnessBot: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [apiKey, setApiKey] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const genAI = new GoogleGenerativeAI("AIzaSyASsNHYrcUMqFjuOReNMICSn6IRTtFpkf0");
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
   const detectCategory = (message: string): 'fitness' | 'nutrition' | 'mental' | undefined => {
     const lowerMessage = message.toLowerCase();
@@ -55,46 +57,16 @@ const WellnessBot: React.FC = () => {
   };
 
   const getAIResponse = async (userMessage: string, category?: 'fitness' | 'nutrition' | 'mental') => {
-    if (!apiKey) {
-      return "Please provide your Perplexity API key to get personalized responses.";
-    }
-
     try {
       const prompt = category 
-        ? `As a wellness assistant, provide a helpful tip about ${category} in response to: ${userMessage}` 
+        ? `As a wellness assistant specializing in ${category}, provide a helpful and practical response to: ${userMessage}` 
         : `As a wellness assistant, provide a helpful response to: ${userMessage}`;
 
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-sonar-small-128k-online',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a wellness assistant focused on fitness, nutrition, and mental health. Keep responses concise and practical.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 150,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
-      
-      return data.choices[0].message.content;
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
     } catch (error) {
-      console.error('API Error:', error);
+      console.error('Gemini API Error:', error);
       return "I apologize, but I'm having trouble connecting to my knowledge base. Please try again in a moment.";
     }
   };
@@ -106,7 +78,7 @@ const WellnessBot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    const welcomeMessage = "Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind? Please provide your Perplexity API key to get started!";
+    const welcomeMessage = "Hey! 💪 I'm your wellness assistant, ready to help you with fitness, nutrition, and mental wellness. What's on your mind?";
     setIsTyping(true);
     setTimeout(() => {
       addMessage(welcomeMessage, false);
