@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,14 +41,12 @@ const WellnessBot: React.FC = () => {
   };
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
 
   useEffect(() => {
-    // Welcome message
     addMessage("Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind?", false);
   }, []);
 
@@ -62,7 +59,6 @@ const WellnessBot: React.FC = () => {
     addMessage(userMessage, true);
     setIsLoading(true);
 
-    // Simulate response based on message content
     setTimeout(() => {
       let response;
       const lowerMessage = userMessage.toLowerCase();
@@ -162,8 +158,7 @@ const WellnessBot: React.FC = () => {
         </Button>
       </form>
     </div>
-  </div>
-);
+  );
 };
 
 export default WellnessBot;
