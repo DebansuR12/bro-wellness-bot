@@ -140,16 +140,6 @@ const WellnessBot: React.FC = () => {
         <p className="text-gray-600">Your personal guide to fitness, nutrition, and mental health</p>
       </div>
 
-      <div className="mb-4">
-        <Input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Enter your Perplexity API key..."
-          className="w-full"
-        />
-      </div>
-
       <div className="flex gap-2 mb-4 justify-center">
         <Button
           onClick={() => handleQuickSelect('fitness')}
