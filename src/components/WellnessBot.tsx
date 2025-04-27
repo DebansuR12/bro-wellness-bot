@@ -19,29 +19,23 @@ const WellnessBot: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [apiKey, setApiKey] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const wellnessTips = {
-    fitness: [
-      "Try incorporating compound exercises like squats and deadlifts for maximum muscle gain.",
-      "Aim for at least 150 minutes of moderate exercise per week.",
-      "Don't forget to include rest days in your workout routine for proper recovery.",
-    ],
-    nutrition: [
-      "Ensure you're getting enough protein - aim for 1.6-2.2g per kg of body weight.",
-      "Stay hydrated! Drink at least 8 glasses of water daily.",
-      "Include a variety of colorful vegetables in your meals for essential nutrients.",
-    ],
-    mental: [
-      "Practice mindfulness meditation for 10 minutes daily to reduce stress.",
-      "Don't hesitate to reach out to friends or professionals when you need support.",
-      "Maintain a regular sleep schedule for better mental clarity.",
-    ],
-  };
-
-  const addMessage = (content: string, isUser: boolean, category?: 'fitness' | 'nutrition' | 'mental') => {
-    setMessages(prev => [...prev, { content, isUser, timestamp: new Date(), category }]);
+  const detectCategory = (message: string): 'fitness' | 'nutrition' | 'mental' | undefined => {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('fitness') || lowerMessage.includes('workout') || lowerMessage.includes('exercise') || 
+        lowerMessage.includes('gym') || lowerMessage.includes('training')) {
+      return 'fitness';
+    } else if (lowerMessage.includes('food') || lowerMessage.includes('nutrition') || lowerMessage.includes('diet') || 
+               lowerMessage.includes('eating') || lowerMessage.includes('meal')) {
+      return 'nutrition';
+    } else if (lowerMessage.includes('mental') || lowerMessage.includes('stress') || lowerMessage.includes('anxiety') || 
+               lowerMessage.includes('mind') || lowerMessage.includes('meditation')) {
+      return 'mental';
+    }
+    return undefined;
   };
 
   const handleLike = (index: number, liked: boolean) => {
@@ -56,6 +50,55 @@ const WellnessBot: React.FC = () => {
     });
   };
 
+  const addMessage = (content: string, isUser: boolean, category?: 'fitness' | 'nutrition' | 'mental') => {
+    setMessages(prev => [...prev, { content, isUser, timestamp: new Date(), category }]);
+  };
+
+  const getAIResponse = async (userMessage: string, category?: 'fitness' | 'nutrition' | 'mental') => {
+    if (!apiKey) {
+      return "Please provide your Perplexity API key to get personalized responses.";
+    }
+
+    try {
+      const prompt = category 
+        ? `As a wellness assistant, provide a helpful tip about ${category} in response to: ${userMessage}` 
+        : `As a wellness assistant, provide a helpful response to: ${userMessage}`;
+
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-sonar-small-128k-online',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a wellness assistant focused on fitness, nutrition, and mental health. Keep responses concise and practical.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 150,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+      
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('API Error:', error);
+      return "I apologize, but I'm having trouble connecting to my knowledge base. Please try again in a moment.";
+    }
+  };
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
@@ -63,7 +106,7 @@ const WellnessBot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    const welcomeMessage = "Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind?";
+    const welcomeMessage = "Hey bro! 💪 I'm here to help you with fitness, nutrition, and mental wellness. What's on your mind? Please provide your Perplexity API key to get started!";
     setIsTyping(true);
     setTimeout(() => {
       addMessage(welcomeMessage, false);
@@ -76,47 +119,33 @@ const WellnessBot: React.FC = () => {
     if (!inputMessage.trim() || isLoading) return;
 
     const userMessage = inputMessage.trim();
+    const category = detectCategory(userMessage);
+    
     setInputMessage('');
-    addMessage(userMessage, true);
+    addMessage(userMessage, true, category);
     setIsLoading(true);
     setIsTyping(true);
 
-    setTimeout(() => {
-      let response;
-      let category: 'fitness' | 'nutrition' | 'mental' | undefined;
-      const lowerMessage = userMessage.toLowerCase();
-
-      if (lowerMessage.includes('fitness') || lowerMessage.includes('workout') || lowerMessage.includes('exercise')) {
-        response = wellnessTips.fitness[Math.floor(Math.random() * wellnessTips.fitness.length)];
-        category = 'fitness';
-      } else if (lowerMessage.includes('food') || lowerMessage.includes('nutrition') || lowerMessage.includes('diet')) {
-        response = wellnessTips.nutrition[Math.floor(Math.random() * wellnessTips.nutrition.length)];
-        category = 'nutrition';
-      } else if (lowerMessage.includes('mental') || lowerMessage.includes('stress') || lowerMessage.includes('anxiety')) {
-        response = wellnessTips.mental[Math.floor(Math.random() * wellnessTips.mental.length)];
-        category = 'mental';
-      } else {
-        response = "I can help you with fitness, nutrition, and mental wellness. Just let me know what you'd like to focus on!";
-      }
-
-      addMessage(response, false, category);
-      setIsLoading(false);
-      setIsTyping(false);
-    }, 1500);
+    const response = await getAIResponse(userMessage, category);
+    addMessage(response, false, category);
+    
+    setIsLoading(false);
+    setIsTyping(false);
   };
 
-  const handleQuickSelect = (category: 'fitness' | 'nutrition' | 'mental') => {
+  const handleQuickSelect = async (category: 'fitness' | 'nutrition' | 'mental') => {
     if (isLoading) return;
-    const tip = wellnessTips[category][Math.floor(Math.random() * wellnessTips[category].length)];
-    addMessage(`Give me a ${category} tip`, true);
+    
+    const userMessage = `Give me a ${category} tip`;
+    addMessage(userMessage, true, category);
     setIsLoading(true);
     setIsTyping(true);
+
+    const response = await getAIResponse(userMessage, category);
+    addMessage(response, false, category);
     
-    setTimeout(() => {
-      addMessage(tip, false, category);
-      setIsLoading(false);
-      setIsTyping(false);
-    }, 1000);
+    setIsLoading(false);
+    setIsTyping(false);
   };
 
   const getCategoryColor = (category?: 'fitness' | 'nutrition' | 'mental') => {
@@ -137,6 +166,16 @@ const WellnessBot: React.FC = () => {
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">BroBot Wellness Assistant</h1>
         <p className="text-gray-600">Your personal guide to fitness, nutrition, and mental health</p>
+      </div>
+
+      <div className="mb-4">
+        <Input
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="Enter your Perplexity API key..."
+          className="w-full"
+        />
       </div>
 
       <div className="flex gap-2 mb-4 justify-center">
